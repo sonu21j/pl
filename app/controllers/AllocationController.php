@@ -336,58 +336,113 @@ class AllocationController extends Controller {
 
 		// Build filter query
 		$where = [];
-		$params = [];
+$params = [];
 
-		if (!empty($_GET['project_id'])) {
+if (!empty($_GET['project_id'])) {
+    $where[] = "ab.project_id = ?";
+    $params[] = $_GET['project_id'];
+}
 
-			$where[] = "ab.project_id=?";
-			$params[] = $_GET['project_id'];
+if (!empty($_GET['date_from'])) {
+    $where[] = "ab.allocation_date >= ?";
+    $params[] = $_GET['date_from'];
+}
 
-		}
+if (!empty($_GET['date_to'])) {
+    $where[] = "ab.allocation_date <= ?";
+    $params[] = $_GET['date_to'];
+}
 
-		if (!empty($_GET['date_from'])) {
+$sql = "
+SELECT 
 
-			$where[] = "ab.allocation_date>=?";
-			$params[] = $_GET['date_from'];
+    ab.id AS batch_id,
+    ab.allocation_date,
+    ab.shift_time,
 
-		}
+    p.project_name,
 
-		if (!empty($_GET['date_to'])) {
+    u.first_name,
+    u.last_name,
 
-			$where[] = "ab.allocation_date<=?";
-			$params[] = $_GET['date_to'];
+    a.hours,
+    a.platform,
+    a.billing_type
 
-		}
+FROM allocation_batches ab
 
-		$sql = "
-			SELECT ab.id,
-				   p.project_name,
-				   ab.allocation_date,
-				   ab.shift_time
-			FROM allocation_batches ab
-			JOIN projects p ON p.id = ab.project_id
-		";
+JOIN projects p ON p.id = ab.project_id
 
-		if ($where) {
+JOIN allocations a ON a.batch_id = ab.id
 
-			$sql .= " WHERE " . implode(" AND ", $where);
+JOIN users u ON u.id = a.tester_id
+";
 
-		}
+if ($where) {
+    $sql .= " WHERE " . implode(" AND ", $where);
+}
 
-		$sql .= " ORDER BY ab.id DESC";
+$sql .= " ORDER BY ab.allocation_date DESC, ab.id DESC";
 
-		$stmt = $db->prepare($sql);
+$stmt = $db->prepare($sql);
+$stmt->execute($params);
 
-		$stmt->execute($params);
-
-		$batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
-		$this->view('allocation/index', [
-			'batches'=>$batches,
-			'projects'=>$projects,
-			'testers'=>$testers
-		]);
+/*
+Group data Jira-style
+*/
+
+$allocations = [];
+
+foreach ($rows as $row) {
+
+    $batch_id = $row['batch_id'];
+
+    if (!isset($allocations[$batch_id])) {
+
+        $allocations[$batch_id] = [
+
+            'project_name' => $row['project_name'],
+            'date' => $row['allocation_date'],
+            'shift' => $row['shift_time'],
+
+            'total_hours' => 0,
+            'total_ot' => 0,
+
+            'platforms' => [],
+            'testers' => []
+
+        ];
+    }
+
+    $allocations[$batch_id]['total_hours'] += $row['hours'];
+
+    if ($row['billing_type'] == 'Overtime') {
+        $allocations[$batch_id]['total_ot'] += $row['hours'];
+    }
+
+    $allocations[$batch_id]['platforms'][$row['platform']] = true;
+
+    $allocations[$batch_id]['testers'][] = $row;
+}
+
+
+/* Final calculations */
+
+foreach ($allocations as &$batch) {
+
+    $batch['total_testers'] = count($batch['testers']);
+    $batch['total_platforms'] = count($batch['platforms']);
+
+}
+
+
+$this->view('allocation/index', [
+    'allocations' => $allocations,
+    'projects' => $projects   // keep for filters
+]);
 	}
 
 

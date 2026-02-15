@@ -60,8 +60,9 @@ class ProjectController extends Controller {
 			$name,
 			$code,
 			$platform,
-			$_POST['client_allocated_hours'],
-			$_POST['warning_threshold_percent']
+			$_POST['client_allocated_hours'] ?? 0,
+			$_POST['warning_threshold_percent'] ?? 80
+
 			]);
 
 
@@ -90,13 +91,27 @@ class ProjectController extends Controller {
             $code = $_POST['project_code'];
             $platform = $_POST['platform'];
 
-            $stmt = $db->prepare("
-                UPDATE projects
-                SET project_name=?, project_code=?, platform=?
-                WHERE id=?
-            ");
+           $stmt = $db->prepare("
+								UPDATE projects
+								SET 
+								project_name=?,
+								project_code=?,
+								platform=?,
+								client_allocated_hours=?,
+								warning_threshold_percent=?
+								WHERE id=?
+								");
 
-            $stmt->execute([$name, $code, $platform, $id]);
+
+            $stmt->execute([
+
+							$_POST['project_name'],
+							$_POST['project_code'],
+							$_POST['platform'],
+							$_POST['client_allocated_hours'] ?? 0,
+							$_POST['warning_threshold_percent'] ?? 80,
+							$id	]);
+
 
             header("Location: index.php?url=project/index");
             exit;
@@ -106,6 +121,10 @@ class ProjectController extends Controller {
         $stmt->execute([$id]);
 
         $project = $stmt->fetch(PDO::FETCH_ASSOC);
+		if (!$project) 
+		{
+			die("Project not found");
+		}
 
         $this->view('project/edit', ['project' => $project]);
     }

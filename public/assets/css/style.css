@@ -54,3 +54,69 @@ body {
     margin-top: 50px;
     padding: 20px;
 }
+<style>
+
+.jira-card {
+
+    background: #fff;
+    border-left: 4px solid #0052cc;
+
+    padding: 15px;
+    margin-bottom: 15px;
+
+    border-radius: 6px;
+
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+
+}
+
+.jira-title {
+
+    font-weight: bold;
+    font-size: 16px;
+
+}
+
+.jira-sub {
+
+    font-size: 13px;
+    color: #6b778c;
+
+}
+
+.jira-summary {
+
+    margin-top: 8px;
+    font-size: 13px;
+
+}
+
+.jira-row {
+
+    padding: 5px;
+    border-top: 1px solid #eee;
+
+}
+
+.billing-billed {
+
+    color: green;
+    font-weight: bold;
+
+}
+
+.billing-overtime {
+
+    color: red;
+    font-weight: bold;
+
+}
+
+.billing-unbilled {
+
+    color: orange;
+    font-weight: bold;
+
+}
+
+</style>

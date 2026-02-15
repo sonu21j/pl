@@ -48,51 +48,133 @@ Filter
 
 <br>
 
-<table border="1" cellpadding="10">
+<br>
 
-	<tr>
-		<th>ID</th>
-		<th>Project</th>
-		<th>Date</th>
-		<th>Shift</th>
-		<th>Action</th>
-	</tr>
+<?php foreach($allocations as $batch): ?>
 
-	<?php foreach($batches as $batch): ?>
+<div class="jira-card">
 
-	<tr>
+    <div class="jira-header">
 
-		<td><?php echo $batch['id']; ?></td>
+        <div class="jira-title">
+            <?php echo $batch['project_name']; ?>
+        </div>
 
-		<td><?php echo $batch['project_name']; ?></td>
+        <div class="jira-sub">
 
-		<td><?php echo $batch['allocation_date']; ?></td>
+            Date: <?php echo $batch['date']; ?> |
+            Shift: <?php echo $batch['shift']; ?>
 
-		<td><?php echo $batch['shift_time']; ?></td>
-		<td>
+        </div>
 
-			<a href="index.php?url=allocation/details&id=<?php echo $batch['id']; ?>">
-				View
-			</a>
-
-		|
-
-			<a href="index.php?url=allocation/edit&id=<?php echo $batch['id']; ?>">
-				Edit
-			</a>
-
-		|
-
-			<a href="index.php?url=allocation/delete&id=<?php echo $batch['id']; ?>"
-			onclick="return confirm('Delete this allocation?');">
-				Delete
-			</a>
-
-		</td>
+    </div>
 
 
-	</tr>
+    <div class="jira-summary">
 
-	<?php endforeach; ?>
+        Platforms: <?php echo $batch['total_platforms']; ?> |
 
-</table>
+        Testers: <?php echo $batch['total_testers']; ?> |
+
+        Total Hours: <?php echo $batch['total_hours']; ?> |
+
+        OT: <?php echo $batch['total_ot']; ?>
+
+    </div>
+
+
+    <div class="jira-testers">
+
+        <?php foreach($batch['testers'] as $tester): ?>
+
+            <div class="jira-row">
+
+                <b>
+                <?php echo $tester['first_name']." ".$tester['last_name']; ?>
+                </b>
+
+                |
+
+                <?php echo $tester['hours']; ?>h
+
+                |
+
+                <?php echo $tester['platform']; ?>
+
+                |
+
+                <span class="billing-<?php echo strtolower($tester['billing_type']); ?>">
+                    <?php echo $tester['billing_type']; ?>
+                </span>
+
+            </div>
+
+        <?php endforeach; ?>
+
+    </div>
+
+</div>
+
+<?php endforeach; ?>
+
+<style>
+
+.jira-card {
+
+    background: #ffffff;
+
+    border-left: 4px solid #0052cc;
+
+    padding: 15px;
+
+    margin-bottom: 15px;
+
+    border-radius: 6px;
+
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+
+}
+
+.jira-title {
+
+    font-size: 16px;
+    font-weight: bold;
+
+}
+
+.jira-sub {
+
+    font-size: 13px;
+    color: #6b778c;
+    margin-top: 3px;
+
+}
+
+.jira-summary {
+
+    margin-top: 8px;
+    font-size: 13px;
+
+}
+
+.jira-row {
+
+    margin-top: 5px;
+    padding-top: 5px;
+    border-top: 1px solid #eee;
+
+}
+
+.billing-billed {
+    color: green;
+}
+
+.billing-overtime {
+    color: red;
+}
+
+.billing-unbilled {
+    color: orange;
+}
+
+</style>

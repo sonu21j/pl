@@ -69,5 +69,61 @@ class BillingController extends Controller {
             'projects' => $projects
         ]);
     }
+	
+	public function report() {
+
+		if (!in_array($_SESSION['user']['role'], ['admin','manager'])) {
+			die("Access denied");
+		}
+
+		$db = Database::connect();
+
+		$stmt = $db->query("
+			SELECT 
+
+				p.project_name,
+
+				a.platform,
+
+				a.billing_type,
+
+				SUM(a.hours) AS total_hours,
+
+				br.rate_per_hour,
+
+				br.currency,
+
+				SUM(a.hours * br.rate_per_hour) AS total_amount
+
+			FROM allocations a
+
+			JOIN allocation_batches ab
+				ON ab.id = a.batch_id
+
+			JOIN projects p
+				ON p.id = ab.project_id
+
+			JOIN billing_rates br
+				ON br.project_id = ab.project_id
+				AND br.platform = a.platform
+				AND br.billing_type = a.billing_type
+
+			GROUP BY
+				ab.project_id,
+				a.platform,
+				a.billing_type
+
+			ORDER BY
+				p.project_name,
+				a.platform
+		");
+
+		$report = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+		$this->view('billing/report', [
+			'report' => $report
+		]);
+	}
+
 
 }

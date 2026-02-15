@@ -28,6 +28,12 @@
 			</li>
             <li><a href="index.php?url=user/index">Manage Users</a></li>
             <li><a href="index.php?url=project/index">Projects</a></li>
+			
+			<li>
+				<a href="index.php?url=billing/index">
+					Billing
+				</a>
+			</li>
 			<li><a href="#">Company Settings</a></li>
 			
 

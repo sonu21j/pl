@@ -13,6 +13,10 @@
     <th>Project Name</th>
     <th>Code</th>
     <th>Platform</th>
+	<th>Allocated</th>
+	<th>Used</th>
+	<th>Remaining</th>
+	<th>Usage %</th>
     <th>Action</th>
 </tr>
 
@@ -27,6 +31,38 @@
 <td><?php echo $project['project_code']; ?></td>
 
 <td><?php echo $project['platform']; ?></td>
+<td>
+<?php echo $project['client_allocated_hours']; ?>
+</td>
+
+<td>
+<?php echo $project['used_hours']; ?>
+</td>
+
+<td>
+<?php 
+$remaining = $project['client_allocated_hours'] - $project['used_hours'];
+echo $remaining;
+?>
+</td>
+
+<td>
+<?php
+
+if ($project['client_allocated_hours'] > 0) {
+
+    $percent = ($project['used_hours'] / $project['client_allocated_hours']) * 100;
+
+    echo round($percent, 1) . "%";
+
+} else {
+
+    echo "0%";
+
+}
+
+?>
+</td>
 
 <td>
 

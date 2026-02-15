@@ -11,9 +11,23 @@ class ProjectController extends Controller {
         $db = Database::connect();
 
         $stmt = $db->query("
-            SELECT * FROM projects
-            ORDER BY id DESC
-        ");
+			SELECT 
+				p.*,
+
+				COALESCE(
+					(
+						SELECT SUM(a.hours)
+						FROM allocations a
+						JOIN allocation_batches ab 
+							ON ab.id = a.batch_id
+						WHERE ab.project_id = p.id
+					), 0
+				) AS used_hours
+
+			FROM projects p
+			ORDER BY p.id DESC
+		");
+
 
         $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -37,12 +51,19 @@ class ProjectController extends Controller {
             $platform = $_POST['platform'];
 
             $stmt = $db->prepare("
-                INSERT INTO projects
-                (project_name, project_code, platform, created_at)
-                VALUES (?, ?, ?, NOW())
-            ");
+			INSERT INTO projects
+			(project_name, project_code, platform, client_allocated_hours, warning_threshold_percent, created_at)
+			VALUES (?, ?, ?, ?, ?, NOW())
+			");
 
-            $stmt->execute([$name, $code, $platform]);
+			$stmt->execute([
+			$name,
+			$code,
+			$platform,
+			$_POST['client_allocated_hours'],
+			$_POST['warning_threshold_percent']
+			]);
+
 
             header("Location: index.php?url=project/index");
             exit;

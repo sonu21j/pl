@@ -5,6 +5,48 @@
 </a>
 
 <br><br>
+<h3>Filters</h3>
+
+<form method="get">
+
+<input type="hidden" name="url" value="allocation/index">
+
+Project:
+
+<select name="project_id">
+
+<option value="">All</option>
+
+<?php foreach($projects as $project): ?>
+
+<option value="<?php echo $project['id']; ?>">
+
+<?php echo $project['project_name']; ?>
+
+</option>
+
+<?php endforeach; ?>
+
+</select>
+
+
+Date From:
+
+<input type="date" name="date_from">
+
+
+Date To:
+
+<input type="date" name="date_to">
+
+
+<button type="submit">
+Filter
+</button>
+
+</form>
+
+<br>
 
 <table border="1" cellpadding="10">
 

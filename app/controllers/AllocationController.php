@@ -1,315 +1,394 @@
 <?php
 class AllocationController extends Controller {
 
-    public function index() {
 
-        if (!isset($_SESSION['user'])) {
-            header("Location: index.php?url=auth/login");
-            exit;
-        }
 
-        $db = Database::connect();
+	public function create() {
 
-        $stmt = $db->query("
-            SELECT ab.id,
-                   p.project_name,
-                   ab.allocation_date,
-                   ab.shift_time
-            FROM allocation_batches ab
-            JOIN projects p ON p.id = ab.project_id
-            ORDER BY ab.id DESC
-        ");
+		if (!isset($_SESSION['user'])) {
+			header("Location: index.php?url=auth/login");
+			exit;
+		}
 
-        $batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+		$db = Database::connect();
 
-        $this->view('allocation/index', ['batches'=>$batches]);
-    }
+		// SAVE LOGIC
+		if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+			$project_id = $_POST['project_id'];
+			$allocation_date = $_POST['allocation_date'];
+			$shift_time = $_POST['shift_time'];
+			$created_by = $_SESSION['user']['id'];
 
-public function create() {
+			// 1. Insert batch
+			$stmt = $db->prepare("
+				INSERT INTO allocation_batches
+				(project_id, allocation_date, shift_time, created_by)
+				VALUES (?, ?, ?, ?)
+			");
 
-    if (!isset($_SESSION['user'])) {
-        header("Location: index.php?url=auth/login");
-        exit;
-    }
+			$stmt->execute([
+				$project_id,
+				$allocation_date,
+				$shift_time,
+				$created_by
+			]);
 
-    $db = Database::connect();
+			// 2. Get batch_id
+			$batch_id = $db->lastInsertId();
 
-    // SAVE LOGIC
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-        $project_id = $_POST['project_id'];
-        $allocation_date = $_POST['allocation_date'];
-        $shift_time = $_POST['shift_time'];
-        $created_by = $_SESSION['user']['id'];
+		   // 3. Insert testers
 
-        // 1. Insert batch
-        $stmt = $db->prepare("
-            INSERT INTO allocation_batches
-            (project_id, allocation_date, shift_time, created_by)
-            VALUES (?, ?, ?, ?)
-        ");
+			$tester_ids = $_POST['tester_id'];
+			$platforms = $_POST['platform'];
+			$hours = $_POST['hours'];
+			$billing_types = $_POST['billing_type'];
+			$scopes = $_POST['scope'] ?? [];
 
-        $stmt->execute([
-            $project_id,
-            $allocation_date,
-            $shift_time,
-            $created_by
-        ]);
+			$stmt = $db->prepare("
+				INSERT INTO allocations
+				(batch_id, tester_id, scope, platform, hours, billing_type)
+				VALUES (?, ?, ?, ?, ?, ?)
+			");
 
-        // 2. Get batch_id
-        $batch_id = $db->lastInsertId();
+			// Duplicate prevention tracker
+			$seen = [];
 
+			for ($i = 0; $i < count($tester_ids); $i++) {
 
-        // 3. Insert testers
-        $tester_ids = $_POST['tester_id'];
-        $platforms = $_POST['platform'];
-        $hours = $_POST['hours'];
-        $billing_types = $_POST['billing_type'];
-        $scopes = $_POST['scope'] ?? [];
+				if (empty($tester_ids[$i])) continue;
 
-        $stmt = $db->prepare("
-            INSERT INTO allocations
-            (batch_id, tester_id, scope, platform, hours, billing_type)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
+				$scope_value = $scopes[$i] ?? 'QA';
 
-        for ($i = 0; $i < count($tester_ids); $i++) {
+				// Create unique key
+				$key = $tester_ids[$i] . '-' .
+					   $platforms[$i] . '-' .
+					   $billing_types[$i] . '-' .
+					   $scope_value;
 
-            if (empty($tester_ids[$i])) continue;
+				// Check duplicate
+				if (isset($seen[$key])) {
 
-            $scope_value = $scopes[$i] ?? 'QA';
+					die("Duplicate tester entry detected for same tester, platform, scope and billing type.");
 
-            $stmt->execute([
-                $batch_id,
-                $tester_ids[$i],
-                $scope_value,
-                $platforms[$i],
-                $hours[$i],
-                $billing_types[$i]
-            ]);
-        }
+				}
 
-        header("Location: index.php?url=allocation/index");
-        exit;
-    }
+				// Mark as seen
+				$seen[$key] = true;
 
+				// Insert record
+				$stmt->execute([
+					$batch_id,
+					$tester_ids[$i],
+					$scope_value,
+					$platforms[$i],
+					$hours[$i],
+					$billing_types[$i]
+				]);
+			}
 
-    // LOAD FORM DATA
 
-    $projects = $db->query("
-        SELECT * FROM projects
-        ORDER BY project_name
-    ")->fetchAll(PDO::FETCH_ASSOC);
+			header("Location: index.php?url=allocation/index");
+			exit;
+		}
 
 
-    $testers = $db->query("
-        SELECT id, first_name, last_name
-        FROM users
-        WHERE role='tester' AND status='active'
-        ORDER BY first_name
-    ")->fetchAll(PDO::FETCH_ASSOC);
+		// LOAD FORM DATA
 
+		$projects = $db->query("
+			SELECT * FROM projects
+			ORDER BY project_name
+		")->fetchAll(PDO::FETCH_ASSOC);
 
-    $this->view('allocation/create', [
-        'projects'=>$projects,
-        'testers'=>$testers
-    ]);
-}
 
-public function details() {
+		$testers = $db->query("
+			SELECT id, first_name, last_name
+			FROM users
+			WHERE role='tester' AND status='active'
+			ORDER BY first_name
+		")->fetchAll(PDO::FETCH_ASSOC);
 
-    if (!isset($_SESSION['user'])) {
-        header("Location: index.php?url=auth/login");
-        exit;
-    }
 
-    $db = Database::connect();
+		$this->view('allocation/create', [
+			'projects'=>$projects,
+			'testers'=>$testers
+		]);
+	}
 
-    $batch_id = $_GET['id'];
+	public function details() {
 
-    $stmt = $db->prepare("
-        SELECT ab.*,
-               p.project_name,
-               u.first_name,
-               u.last_name
-        FROM allocation_batches ab
-        JOIN projects p ON p.id = ab.project_id
-        JOIN users u ON u.id = ab.created_by
-        WHERE ab.id=?
-    ");
+		if (!isset($_SESSION['user'])) {
+			header("Location: index.php?url=auth/login");
+			exit;
+		}
 
-    $stmt->execute([$batch_id]);
+		$db = Database::connect();
 
-    $batch = $stmt->fetch(PDO::FETCH_ASSOC);
+		$batch_id = $_GET['id'];
 
+		$stmt = $db->prepare("
+			SELECT ab.*,
+				   p.project_name,
+				   u.first_name,
+				   u.last_name
+			FROM allocation_batches ab
+			JOIN projects p ON p.id = ab.project_id
+			JOIN users u ON u.id = ab.created_by
+			WHERE ab.id=?
+		");
 
-    $stmt = $db->prepare("
-        SELECT a.*,
-               u.first_name,
-               u.last_name
-        FROM allocations a
-        JOIN users u ON u.id = a.tester_id
-        WHERE a.batch_id=?
-    ");
+		$stmt->execute([$batch_id]);
 
-    $stmt->execute([$batch_id]);
+		$batch = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $testers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+		$stmt = $db->prepare("
+			SELECT a.*,
+				   u.first_name,
+				   u.last_name
+			FROM allocations a
+			JOIN users u ON u.id = a.tester_id
+			WHERE a.batch_id=?
+		");
 
-    $this->view('allocation/view', [
-        'batch'=>$batch,
-        'testers'=>$testers
-    ]);
-}
-public function delete() {
+		$stmt->execute([$batch_id]);
 
-    if (!isset($_SESSION['user'])) {
-        header("Location: index.php?url=auth/login");
-        exit;
-    }
+		$testers = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $db = Database::connect();
 
-    $batch_id = $_GET['id'];
+		$this->view('allocation/view', [
+			'batch'=>$batch,
+			'testers'=>$testers
+		]);
+	}
+	public function delete() {
 
-    // delete child records first
-    $stmt = $db->prepare("
-        DELETE FROM allocations
-        WHERE batch_id=?
-    ");
+		if (!isset($_SESSION['user'])) {
+			header("Location: index.php?url=auth/login");
+			exit;
+		}
 
-    $stmt->execute([$batch_id]);
+		$db = Database::connect();
 
-    // delete batch
-    $stmt = $db->prepare("
-        DELETE FROM allocation_batches
-        WHERE id=?
-    ");
+		$batch_id = $_GET['id'];
 
-    $stmt->execute([$batch_id]);
+		// delete child records first
+		$stmt = $db->prepare("
+			DELETE FROM allocations
+			WHERE batch_id=?
+		");
 
-    header("Location: index.php?url=allocation/index");
-    exit;
-}
-public function edit() {
+		$stmt->execute([$batch_id]);
 
-    if (!isset($_SESSION['user'])) {
-        header("Location: index.php?url=auth/login");
-        exit;
-    }
+		// delete batch
+		$stmt = $db->prepare("
+			DELETE FROM allocation_batches
+			WHERE id=?
+		");
 
-    $db = Database::connect();
+		$stmt->execute([$batch_id]);
 
-    $batch_id = $_GET['id'];
+		header("Location: index.php?url=allocation/index");
+		exit;
+	}
+	public function edit() {
 
-    // SAVE UPDATED DATA
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+		if (!isset($_SESSION['user'])) {
+			header("Location: index.php?url=auth/login");
+			exit;
+		}
 
-        $project_id = $_POST['project_id'];
-        $allocation_date = $_POST['allocation_date'];
-        $shift_time = $_POST['shift_time'];
+		$db = Database::connect();
 
-        // update batch
-        $stmt = $db->prepare("
-            UPDATE allocation_batches
-            SET project_id=?, allocation_date=?, shift_time=?
-            WHERE id=?
-        ");
+		$batch_id = $_GET['id'];
 
-        $stmt->execute([
-            $project_id,
-            $allocation_date,
-            $shift_time,
-            $batch_id
-        ]);
+		// SAVE UPDATED DATA
+		if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+			$project_id = $_POST['project_id'];
+			$allocation_date = $_POST['allocation_date'];
+			$shift_time = $_POST['shift_time'];
 
-        // delete old testers
-        $stmt = $db->prepare("
-            DELETE FROM allocations
-            WHERE batch_id=?
-        ");
+			// update batch
+			$stmt = $db->prepare("
+				UPDATE allocation_batches
+				SET project_id=?, allocation_date=?, shift_time=?
+				WHERE id=?
+			");
 
-        $stmt->execute([$batch_id]);
+			$stmt->execute([
+				$project_id,
+				$allocation_date,
+				$shift_time,
+				$batch_id
+			]);
 
 
-        // insert new testers
-        $tester_ids = $_POST['tester_id'];
-        $platforms = $_POST['platform'];
-        $hours = $_POST['hours'];
-        $billing_types = $_POST['billing_type'];
-        $scopes = $_POST['scope'];
+			// delete old testers
+			$stmt = $db->prepare("
+				DELETE FROM allocations
+				WHERE batch_id=?
+			");
 
-        $stmt = $db->prepare("
-            INSERT INTO allocations
-            (batch_id, tester_id, scope, platform, hours, billing_type)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ");
+			$stmt->execute([$batch_id]);
 
-        for ($i=0; $i<count($tester_ids); $i++) {
 
-            if (empty($tester_ids[$i])) continue;
+			// insert new testers
+			$tester_ids = $_POST['tester_id'];
+			$platforms = $_POST['platform'];
+			$hours = $_POST['hours'];
+			$billing_types = $_POST['billing_type'];
+			$scopes = $_POST['scope'];
 
-            $stmt->execute([
-                $batch_id,
-                $tester_ids[$i],
-                $scopes[$i],
-                $platforms[$i],
-                $hours[$i],
-                $billing_types[$i]
-            ]);
-        }
+			$stmt = $db->prepare("
+				INSERT INTO allocations
+				(batch_id, tester_id, scope, platform, hours, billing_type)
+				VALUES (?, ?, ?, ?, ?, ?)
+			");
 
-        header("Location: index.php?url=allocation/details&id=".$batch_id);
-        exit;
-    }
+			for ($i=0; $i<count($tester_ids); $i++) {
 
+				if (empty($tester_ids[$i])) continue;
 
-    // LOAD DATA
+				$stmt->execute([
+					$batch_id,
+					$tester_ids[$i],
+					$scopes[$i],
+					$platforms[$i],
+					$hours[$i],
+					$billing_types[$i]
+				]);
+			}
 
-    $projects = $db->query("
-        SELECT * FROM projects
-    ")->fetchAll(PDO::FETCH_ASSOC);
+			header("Location: index.php?url=allocation/details&id=".$batch_id);
+			exit;
+		}
 
 
-    $testers = $db->query("
-        SELECT id, first_name, last_name
-        FROM users
-        WHERE role='tester'
-    ")->fetchAll(PDO::FETCH_ASSOC);
+		// LOAD DATA
 
+		$projects = $db->query("
+			SELECT * FROM projects
+		")->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt = $db->prepare("
-        SELECT *
-        FROM allocation_batches
-        WHERE id=?
-    ");
 
-    $stmt->execute([$batch_id]);
+		$testers = $db->query("
+			SELECT id, first_name, last_name
+			FROM users
+			WHERE role='tester'
+		")->fetchAll(PDO::FETCH_ASSOC);
 
-    $batch = $stmt->fetch(PDO::FETCH_ASSOC);
 
+		$stmt = $db->prepare("
+			SELECT *
+			FROM allocation_batches
+			WHERE id=?
+		");
 
-    $stmt = $db->prepare("
-        SELECT *
-        FROM allocations
-        WHERE batch_id=?
-    ");
+		$stmt->execute([$batch_id]);
 
-    $stmt->execute([$batch_id]);
+		$batch = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $allocations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+		$stmt = $db->prepare("
+			SELECT *
+			FROM allocations
+			WHERE batch_id=?
+		");
 
-    $this->view('allocation/edit', [
-        'batch'=>$batch,
-        'allocations'=>$allocations,
-        'projects'=>$projects,
-        'testers'=>$testers
-    ]);
-}
+		$stmt->execute([$batch_id]);
+
+		$allocations = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+		$this->view('allocation/edit', [
+			'batch'=>$batch,
+			'allocations'=>$allocations,
+			'projects'=>$projects,
+			'testers'=>$testers
+		]);
+	}
+
+	public function index() {
+
+		if (!isset($_SESSION['user'])) {
+			header("Location: index.php?url=auth/login");
+			exit;
+		}
+
+		$db = Database::connect();
+
+		// Load filter dropdown data
+		$projects = $db->query("
+			SELECT id, project_name FROM projects
+			ORDER BY project_name
+		")->fetchAll(PDO::FETCH_ASSOC);
+
+
+		$testers = $db->query("
+			SELECT id, first_name, last_name
+			FROM users
+			WHERE role='tester'
+			ORDER BY first_name
+		")->fetchAll(PDO::FETCH_ASSOC);
+
+
+		// Build filter query
+		$where = [];
+		$params = [];
+
+		if (!empty($_GET['project_id'])) {
+
+			$where[] = "ab.project_id=?";
+			$params[] = $_GET['project_id'];
+
+		}
+
+		if (!empty($_GET['date_from'])) {
+
+			$where[] = "ab.allocation_date>=?";
+			$params[] = $_GET['date_from'];
+
+		}
+
+		if (!empty($_GET['date_to'])) {
+
+			$where[] = "ab.allocation_date<=?";
+			$params[] = $_GET['date_to'];
+
+		}
+
+		$sql = "
+			SELECT ab.id,
+				   p.project_name,
+				   ab.allocation_date,
+				   ab.shift_time
+			FROM allocation_batches ab
+			JOIN projects p ON p.id = ab.project_id
+		";
+
+		if ($where) {
+
+			$sql .= " WHERE " . implode(" AND ", $where);
+
+		}
+
+		$sql .= " ORDER BY ab.id DESC";
+
+		$stmt = $db->prepare($sql);
+
+		$stmt->execute($params);
+
+		$batches = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+		$this->view('allocation/index', [
+			'batches'=>$batches,
+			'projects'=>$projects,
+			'testers'=>$testers
+		]);
+	}
 
 
 }// class end

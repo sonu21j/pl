@@ -336,113 +336,115 @@ class AllocationController extends Controller {
 
 		// Build filter query
 		$where = [];
-$params = [];
+		$params = [];
 
-if (!empty($_GET['project_id'])) {
-    $where[] = "ab.project_id = ?";
-    $params[] = $_GET['project_id'];
-}
+		if (!empty($_GET['project_id'])) {
+			$where[] = "ab.project_id = ?";
+			$params[] = $_GET['project_id'];
+		}
 
-if (!empty($_GET['date_from'])) {
-    $where[] = "ab.allocation_date >= ?";
-    $params[] = $_GET['date_from'];
-}
+		if (!empty($_GET['date_from'])) {
+			$where[] = "ab.allocation_date >= ?";
+			$params[] = $_GET['date_from'];
+		}
 
-if (!empty($_GET['date_to'])) {
-    $where[] = "ab.allocation_date <= ?";
-    $params[] = $_GET['date_to'];
-}
+		if (!empty($_GET['date_to'])) {
+			$where[] = "ab.allocation_date <= ?";
+			$params[] = $_GET['date_to'];
+		}
 
-$sql = "
-SELECT 
+		$sql = "
+		SELECT 
 
-    ab.id AS batch_id,
-    ab.allocation_date,
-    ab.shift_time,
+			ab.id AS batch_id,
+			ab.allocation_date,
+			ab.shift_time,
 
-    p.project_name,
+			p.project_name,
 
-    u.first_name,
-    u.last_name,
+			u.first_name,
+			u.last_name,
 
-    a.hours,
-    a.platform,
-    a.billing_type
+			a.hours,
+			a.platform,
+			a.billing_type
 
-FROM allocation_batches ab
+		FROM allocation_batches ab
 
-JOIN projects p ON p.id = ab.project_id
+		JOIN projects p ON p.id = ab.project_id
 
-JOIN allocations a ON a.batch_id = ab.id
+		JOIN allocations a ON a.batch_id = ab.id
 
-JOIN users u ON u.id = a.tester_id
-";
+		JOIN users u ON u.id = a.tester_id
+		";
 
-if ($where) {
-    $sql .= " WHERE " . implode(" AND ", $where);
-}
+		if ($where) {
+			$sql .= " WHERE " . implode(" AND ", $where);
+		}
 
-$sql .= " ORDER BY ab.allocation_date DESC, ab.id DESC";
+		$sql .= " ORDER BY ab.allocation_date DESC, ab.id DESC";
 
-$stmt = $db->prepare($sql);
-$stmt->execute($params);
+		$stmt = $db->prepare($sql);
+		$stmt->execute($params);
 
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-
-/*
-Group data Jira-style
-*/
-
-$allocations = [];
-
-foreach ($rows as $row) {
-
-    $batch_id = $row['batch_id'];
-
-    if (!isset($allocations[$batch_id])) {
-
-        $allocations[$batch_id] = [
-
-            'project_name' => $row['project_name'],
-            'date' => $row['allocation_date'],
-            'shift' => $row['shift_time'],
-
-            'total_hours' => 0,
-            'total_ot' => 0,
-
-            'platforms' => [],
-            'testers' => []
-
-        ];
-    }
-
-    $allocations[$batch_id]['total_hours'] += $row['hours'];
-
-    if ($row['billing_type'] == 'Overtime') {
-        $allocations[$batch_id]['total_ot'] += $row['hours'];
-    }
-
-    $allocations[$batch_id]['platforms'][$row['platform']] = true;
-
-    $allocations[$batch_id]['testers'][] = $row;
-}
+		$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 
-/* Final calculations */
+		/*
+		Group data Jira-style
+		*/
 
-foreach ($allocations as &$batch) {
+		$allocations = [];
 
-    $batch['total_testers'] = count($batch['testers']);
-    $batch['total_platforms'] = count($batch['platforms']);
+		foreach ($rows as $row) {
 
-}
+			$batch_id = $row['batch_id'];
+
+			if (!isset($allocations[$batch_id])) {
+
+				$allocations[$batch_id] = [
+
+					'batch_id' => $batch_id,
+
+					'project_name' => $row['project_name'],
+					'date' => $row['allocation_date'],
+					'shift' => $row['shift_time'],
+
+					'total_hours' => 0,
+					'total_ot' => 0,
+
+					'platforms' => [],
+					'testers' => []
+				];
+
+			}
+
+			$allocations[$batch_id]['total_hours'] += $row['hours'];
+
+			if ($row['billing_type'] == 'Overtime') {
+				$allocations[$batch_id]['total_ot'] += $row['hours'];
+			}
+
+			$allocations[$batch_id]['platforms'][$row['platform']] = true;
+
+			$allocations[$batch_id]['testers'][] = $row;
+		}
 
 
-$this->view('allocation/index', [
-    'allocations' => $allocations,
-    'projects' => $projects   // keep for filters
-]);
+		/* Final calculations */
+
+		foreach ($allocations as &$batch) {
+
+			$batch['total_testers'] = count($batch['testers']);
+			$batch['total_platforms'] = count($batch['platforms']);
+
+		}
+
+
+		$this->view('allocation/index', [
+			'allocations' => $allocations,
+			'projects' => $projects   // keep for filters
+		]);
 	}
 
 

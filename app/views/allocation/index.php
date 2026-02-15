@@ -54,20 +54,43 @@ Filter
 
 <div class="jira-card">
 
-    <div class="jira-header">
+<div class="jira-header">
+
+    <div class="jira-header-left">
 
         <div class="jira-title">
             <?php echo $batch['project_name']; ?>
         </div>
 
         <div class="jira-sub">
-
             Date: <?php echo $batch['date']; ?> |
             Shift: <?php echo $batch['shift']; ?>
-
         </div>
 
     </div>
+
+    <div class="jira-actions">
+
+        <a class="btn-view"
+           href="index.php?url=allocation/details&id=<?php echo $batch['batch_id']; ?>">
+           View
+        </a>
+
+        <a class="btn-edit"
+           href="index.php?url=allocation/edit&id=<?php echo $batch['batch_id']; ?>">
+           Edit
+        </a>
+
+        <a class="btn-delete"
+           href="index.php?url=allocation/delete&id=<?php echo $batch['batch_id']; ?>"
+           onclick="return confirm('Delete this allocation?');">
+           Delete
+        </a>
+
+    </div>
+
+</div>
+
 
 
     <div class="jira-summary">
@@ -118,20 +141,33 @@ Filter
 <?php endforeach; ?>
 
 <style>
-
 .jira-card {
 
     background: #ffffff;
 
     border-left: 4px solid #0052cc;
 
-    padding: 15px;
-
+    padding: 16px;
     margin-bottom: 15px;
 
-    border-radius: 6px;
+    border-radius: 8px;
 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+
+    transition: 0.2s;
+}
+
+.jira-card:hover {
+
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+
+}
+
+.jira-header {
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 
 }
 
@@ -139,6 +175,7 @@ Filter
 
     font-size: 16px;
     font-weight: bold;
+    color: #172b4d;
 
 }
 
@@ -146,7 +183,6 @@ Filter
 
     font-size: 13px;
     color: #6b778c;
-    margin-top: 3px;
 
 }
 
@@ -154,27 +190,68 @@ Filter
 
     margin-top: 8px;
     font-size: 13px;
+    color: #172b4d;
 
 }
 
 .jira-row {
 
-    margin-top: 5px;
-    padding-top: 5px;
+    padding: 6px 0;
     border-top: 1px solid #eee;
 
 }
 
+.jira-actions a {
+
+    margin-left: 8px;
+    text-decoration: none;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+
+}
+
+.btn-view {
+
+    background: #0052cc;
+    color: white;
+
+}
+
+.btn-edit {
+
+    background: #36b37e;
+    color: white;
+
+}
+
+.btn-delete {
+
+    background: #de350b;
+    color: white;
+
+}
+
 .billing-billed {
-    color: green;
+
+    color: #36b37e;
+    font-weight: bold;
+
 }
 
 .billing-overtime {
-    color: red;
+
+    color: #de350b;
+    font-weight: bold;
+
 }
 
 .billing-unbilled {
-    color: orange;
+
+    color: #ff8b00;
+    font-weight: bold;
+
 }
+
 
 </style>
